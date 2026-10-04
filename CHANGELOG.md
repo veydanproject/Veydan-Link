@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1: the image is `rookbeam/vlink` (2026-10-05)
+
+- The Docker image of the bridge is published as `rookbeam/vlink`; the
+  namespace `veydan` on Docker Hub is not the project's. The bridge itself
+  is the same as 0.1.0.
+
 ## The app's link is `veydan://vlink/…` (2026-10-04)
 
 - `vlink link` prints `veydan://vlink/<id>?a=<address:port>`; it printed

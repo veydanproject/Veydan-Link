@@ -25,7 +25,7 @@ whose users you want to help:
 
 ```
 docker run -d --name vlink --restart=unless-stopped \
-  --network=host -v vlink:/data veydan/vlink
+  --network=host -v vlink:/data rookbeam/vlink
 ```
 
 That is all. The bridge makes its own key on the first start, tells the

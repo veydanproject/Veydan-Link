@@ -1,7 +1,7 @@
 # The bridge as an image:  make image
 #
 #   docker run -d --name vlink --restart=unless-stopped \
-#     -p 443:443 -v vlink:/data veydan/vlink
+#     -p 443:443 -v vlink:/data rookbeam/vlink
 #
 # The image holds one static binary, its licence and the notices of the
 # crates it is built from, nothing else: no shell, no system. /data keeps

@@ -28,7 +28,7 @@ release-all:
 	@bash scripts/build-all.sh
 
 # The bridge as a docker image.
-IMAGE ?= veydan/vlink
+IMAGE ?= rookbeam/vlink
 image: release
 	@docker build -q -t $(IMAGE):$$(cut -d- -f1 dist/RELEASE) -t $(IMAGE):latest -f deploy/Dockerfile . >/dev/null
 	@echo ">> $(IMAGE):$$(cut -d- -f1 dist/RELEASE)"

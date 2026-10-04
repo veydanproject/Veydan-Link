@@ -1,7 +1,7 @@
 name: Release
 
 # A tag vX.Y.Z publishes the bridge: static binaries for four systems with
-# their SHA256SUMS in the release of the tag, and the image veydan/vlink.
+# their SHA256SUMS in the release of the tag, and the image rookbeam/vlink.
 # This is the one place volunteers take the bridge from.
 on:
   push:
@@ -63,8 +63,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Publish the image veydan/vlink
+      - name: Publish the image rookbeam/vlink
         run: |
-          docker build -t "veydan/vlink:$VERSION" -t veydan/vlink:latest -f deploy/Dockerfile .
-          docker push "veydan/vlink:$VERSION"
-          docker push veydan/vlink:latest
+          docker build -t "rookbeam/vlink:$VERSION" -t rookbeam/vlink:latest -f deploy/Dockerfile .
+          docker push "rookbeam/vlink:$VERSION"
+          docker push rookbeam/vlink:latest
