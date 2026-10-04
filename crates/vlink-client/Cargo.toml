@@ -1,0 +1,19 @@
+[package]
+name = "vlink-client"
+description = "VLink client: opens streams to Veydan servers through a bridge. Every platform, nothing of the system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+license-file.workspace = true
+
+[dependencies]
+vlink-proto = { workspace = true }
+bytes = { workspace = true }
+h2 = { workspace = true }
+http = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+tracing = { workspace = true }

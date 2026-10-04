@@ -1,0 +1,24 @@
+name: CI
+
+# The bridge, the protocol and the client library: tests and clippy from a
+# clean clone. Also the gate of the release workflow (release.yml → checks).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      # The version and the components rust-toolchain.toml names.
+      - name: Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: swatinem/rust-cache@v2
+      - name: Tests
+        run: cargo test --workspace --all-targets --locked
+      - name: Clippy (blocking)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings

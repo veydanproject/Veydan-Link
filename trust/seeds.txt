@@ -1,0 +1,4 @@
+# Bridges built into the binaries, one reference per line: a new bridge
+# reaches the registry through them when the direct way is closed.
+45.93.201.244:443#9c5f434def40ebc2879201642bab6c69063578c4a302aa92de5918b3663ffbfc
+81.161.117.216:8443#5ebb17ab8462d96b288f726c2226d9f0e8b1e7c2488db21545750ff5aafd95de

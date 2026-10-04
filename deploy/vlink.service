@@ -1,0 +1,51 @@
+[Unit]
+Description=VLink bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=vlink
+Group=vlink
+Environment=VLINK_LISTEN=0.0.0.0:443
+Environment=VLINK_DATA=/opt/vlink/data
+# The port and the like, when they differ from the above.
+EnvironmentFile=-/opt/vlink/etc/vlink.env
+ExecStart=/opt/vlink/bin/vlink bridge
+Restart=always
+RestartSec=2
+TimeoutStopSec=10
+
+# The bridge's key is for the bridge alone.
+UMask=0077
+
+# The bridge needs the network, one directory and, for a port below 1024,
+# the right to bind it. Nothing else of the machine.
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+ReadWritePaths=/opt/vlink/data
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+[package]
+name = "vlink-proto"
+description = "VLink: what the client, the bridge and the hub share (names, TLS pinning, streams)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+license-file.workspace = true
+
+[dependencies]
+bytes = { workspace = true }
+h2 = { workspace = true }
+http = { workspace = true }
+ring = { workspace = true }
+rustls = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

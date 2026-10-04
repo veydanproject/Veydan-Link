@@ -1,0 +1,33 @@
+[package]
+name = "vlink"
+description = "VLink bridge: accepts clients and relays their streams into the links hubs opened"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+license-file.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vlink"
+path = "src/main.rs"
+
+[dependencies]
+vlink-proto = { workspace = true }
+vlink-client = { workspace = true }
+anyhow = { workspace = true }
+bytes = { workspace = true }
+clap = { workspace = true }
+h2 = { workspace = true }
+http = { workspace = true }
+rcgen = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+webpki-roots = { workspace = true }
