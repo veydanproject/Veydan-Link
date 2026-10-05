@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2: the built-in bridge (2026-10-05)
+
+- `trust/seeds.txt` names the bridge that runs now at `45.93.201.244:443`
+  (it got a new key when its server was set up again); the two it named
+  are gone. The seeds are how a client and a new bridge reach the registry
+  when the direct way is closed. The bridge itself is the same as 0.1.1.
+
 ## 0.1.1: the image is `rookbeam/vlink` (2026-10-05)
 
 - The Docker image of the bridge is published as `rookbeam/vlink`; the
