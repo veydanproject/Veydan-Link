@@ -30,7 +30,10 @@ docker run -d --name vlink --restart=unless-stopped \
 
 That is all. The bridge makes its own key on the first start, tells the
 Veydan registry it exists, and starts carrying traffic once a hub has
-reached it. Nothing to configure, no domain, no certificate.
+reached it. Nothing to configure, no domain, no certificate to get: the
+bridge is known by its key, and the TLS key and certificate it makes next
+to it may be replaced at any time (`vlink id --renew-cert`, then a
+restart).
 
 Or the binary, as a service — see `deploy/vlink.service`.
 

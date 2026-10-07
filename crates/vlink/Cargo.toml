@@ -24,6 +24,7 @@ clap = { workspace = true }
 h2 = { workspace = true }
 http = { workspace = true }
 rcgen = { workspace = true }
+ring = { workspace = true }
 tokio = { workspace = true }
 tokio-rustls = { workspace = true }
 tracing = { workspace = true }

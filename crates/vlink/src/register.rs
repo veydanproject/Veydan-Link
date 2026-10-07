@@ -1,8 +1,12 @@
 //! The bridge tells the registry that it exists, and keeps telling.
 //!
-//! The first report makes the bridge known; a hub then dials it and sees
-//! its certificate. Later reports say it is still there and how many hubs
+//! The first report makes the bridge known; a hub then dials it and has it
+//! prove its key. Later reports say it is still there and how many hubs
 //! have links to it. A bridge that stops reporting is dropped from the lists.
+//!
+//! Every report is signed by the bridge's key, with the time it was made:
+//! the registry takes an address for the bridge's id from nobody else, and
+//! not from a report kept and sent again later.
 //!
 //! A report is a few hundred bytes. It goes straight to the registry, and
 //! when that way is closed, through one of the bridges built into the binary.
@@ -11,6 +15,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use vlink_client::Client;
+use vlink_proto::sign::Signer;
 use vlink_proto::wire::{Registered, Registration, State};
 use vlink_proto::{BridgeId, BridgeRef};
 
@@ -27,6 +32,8 @@ pub struct Registrar {
     /// Bridges to go through when a registry is not reached directly.
     pub seeds: Vec<BridgeRef>,
     pub id: BridgeId,
+    /// The bridge's key, which signs every report.
+    pub signer: Signer,
     pub port: u16,
     /// The bridge's public address, when the operator named it. Needed
     /// when reports go through another bridge: the registry then sees the
@@ -65,13 +72,17 @@ impl Registrar {
     }
 
     async fn report(&self, registry: &str, through: Option<&Client>) -> anyhow::Result<Registered> {
-        let request = Registration {
+        let mut request = Registration {
             id: self.id,
             port: self.port,
             ip: self.public_ip,
             hubs: self.handle.status().hubs.len() as u32,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            ts: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+            key: String::new(),
+            sig: String::new(),
         };
+        self.signer.sign_registration(&mut request);
         let body = serde_json::to_vec(&request)?;
         let url = format!("{}/v1/register", registry.trim_end_matches('/'));
         let answer = match https::call("POST", &url, None, Some(&body), None).await {

@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.0 (2026-10-08): identity v2, the key apart from the certificate
+
+- A bridge has a permanent Ed25519 key (`bridge.key`) of its own and,
+  apart from it, a TLS key (`tls.key`, ECDSA P-256) with a certificate
+  over it that the bridge's key signed (`bridge.crt`: that certificate,
+  then the one carrying the bridge's key). The id is SHA-256 of the
+  bridge's key (its SubjectPublicKeyInfo in DER); it was SHA-256 of the
+  certificate. Clients and hubs pin the bridge's key, as HPKP did: any
+  TLS certificate it signed is taken, and the TLS 1.3 handshake is signed
+  with the TLS key in it. The TLS key is of the kind every browser takes,
+  so a passer-by still completes the handshake and gets the nginx page
+  rather than an alert that tells the bridge apart. `vlink id
+  --renew-cert`, then a restart, replaces the TLS key and the
+  certificate; the id stays. The same scheme is to serve the call nodes
+  (`vcall`).
+- A bridge signs its reports to the registry with its key (`key`, `ts`,
+  `sig` in the registration): the registry takes an address for an id
+  from that key only, so nobody else can report a bridge at an address
+  of their own and have it struck off as unreachable there. A report
+  older than five minutes is refused.
+- No way back: a bridge made before this (P-256 key, id of the
+  certificate) has to start again without `bridge.key`, `tls.key` and
+  `bridge.crt`; its id changes,
+  and `trust/seeds.txt` with it. The reference `address:port#id` and the
+  link `veydan://vlink/…` keep their form.
+- `vlink-proto` reads certificates with `rustls-webpki`, the parser rustls
+  checks handshake signatures with.
+
 ## 0.1.2: the built-in bridge (2026-10-05)
 
 - `trust/seeds.txt` names the bridge that runs now at `45.93.201.244:443`

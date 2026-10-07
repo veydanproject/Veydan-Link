@@ -47,7 +47,7 @@ struct BridgeArgs {
     /// Address to listen on.
     #[arg(long, env = "VLINK_LISTEN", default_value = "0.0.0.0:443")]
     listen: SocketAddr,
-    /// Where the bridge keeps its certificate.
+    /// Where the bridge keeps its keys and certificate.
     #[arg(long, env = "VLINK_DATA", default_value = "data")]
     data: PathBuf,
     /// Another root than the built-in one (PEM), for a network of one's own.
@@ -91,6 +91,11 @@ enum Command {
         /// The public address of the bridge, `address:port`.
         #[arg(long)]
         addr: Option<SocketAddr>,
+        /// Make a new TLS key and a new certificate over it, signed by
+        /// the bridge's key, first. The id stays; a running bridge shows
+        /// the new certificate after a restart.
+        #[arg(long)]
+        renew_cert: bool,
     },
     /// A local SOCKS5 door through a bridge:  curl --socks5-hostname ...
     Client {
@@ -183,15 +188,15 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
         None => ROOT_PEM.to_string(),
     };
     let root = tls::cert_from_pem(&root_pem).context("the root certificate")?;
-    let identity = identity::load_or_create(&args.data)?;
-    let id = identity.bridge_id();
+    let keys = identity::load_or_create(&args.data)?;
+    let id = keys.id;
     let listener = TcpListener::bind(args.listen)
         .await
         .with_context(|| format!("cannot listen on {}", args.listen))?;
     let bridge = Bridge::new(
         listener,
         Config {
-            identity,
+            identity: keys.tls,
             root,
             max_connections: args.max_connections,
             link_test_bytes: vlink::LINK_TEST_BYTES,
@@ -208,6 +213,7 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
                 registries,
                 seeds: built_in_seeds(),
                 id,
+                signer: keys.signer,
                 port: args.public_port.unwrap_or(args.listen.port()),
                 public_ip: args.public_ip,
                 handle: bridge.handle(),
@@ -278,8 +284,9 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         None => run_bridge(cli.bridge).await,
         Some(Command::Bridge(args)) => run_bridge(args).await,
-        Some(Command::Id { data, addr }) => {
-            let id = identity::load_or_create(&data)?.bridge_id();
+        Some(Command::Id { data, addr, renew_cert }) => {
+            let keys = if renew_cert { identity::renew(&data)? } else { identity::load_or_create(&data)? };
+            let id = keys.id;
             match addr {
                 Some(addr) => println!("{}", BridgeRef { addr, id, sni: None }),
                 None => println!("{id}"),
@@ -287,7 +294,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             Ok(())
         }
         Some(Command::Link { data, addr }) => {
-            let id = identity::load_or_create(&data)?.bridge_id();
+            let id = identity::load_or_create(&data)?.id;
             println!("{}", bridge_link(&BridgeRef { addr, id, sni: None }));
             Ok(())
         }

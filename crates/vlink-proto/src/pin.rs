@@ -1,9 +1,19 @@
-//! Calling a bridge: TLS to an address, with one certificate accepted.
+//! Calling a bridge: TLS to an address, with one key accepted.
 //!
-//! A bridge shows a certificate it made itself. Nobody signs it; whoever
-//! calls knows its hash ([`BridgeId`]) and accepts nothing else. So a
-//! bridge needs no name and no authority, and nobody who sits on the way
-//! can answer in its place.
+//! A bridge shows two certificates: one over the key TLS runs on, signed
+//! by the bridge's own key, and one carrying that key. No authority signs
+//! either; whoever calls knows the hash of the bridge's key ([`BridgeId`])
+//! and accepts nothing else. So a bridge needs no name and no authority,
+//! and nobody who sits on the way can answer in its place: the TLS
+//! certificate has to be signed by the bridge's key, and the handshake by
+//! the TLS key in it. The TLS key and its certificate may change (be
+//! issued again, carry other names or dates); only the key that signed
+//! them is looked at.
+//!
+//! The TLS key is of the kind every browser takes (ECDSA P-256), so a
+//! passer-by that is not a client of VLink completes the handshake too and
+//! gets the page a bare web server would give, rather than an alert that
+//! tells the bridge apart.
 
 use std::sync::Arc;
 
@@ -28,7 +38,10 @@ pub(crate) fn tls(e: impl std::fmt::Display) -> Error {
     Error::Tls(e.to_string())
 }
 
-/// Accepts exactly one certificate: the one whose hash is the bridge's id.
+/// Accepts exactly one key: the one whose hash is the bridge's id. The
+/// TLS certificate may be any that key signed; what proves that the other
+/// side holds the TLS key is the handshake signature, which rustls has
+/// this verifier check against the certificate (`verify_tls13_signature`).
 #[derive(Debug)]
 struct Pinned {
     id: BridgeId,
@@ -39,15 +52,18 @@ impl ServerCertVerifier for Pinned {
     fn verify_server_cert(
         &self,
         end_entity: &CertificateDer<'_>,
-        _intermediates: &[CertificateDer<'_>],
+        intermediates: &[CertificateDer<'_>],
         _server_name: &ServerName<'_>,
         _ocsp_response: &[u8],
-        _now: UnixTime,
+        now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
-        if BridgeId::of_cert(end_entity.as_ref()) == self.id {
-            Ok(ServerCertVerified::assertion())
-        } else {
-            Err(rustls::Error::InvalidCertificate(rustls::CertificateError::ApplicationVerificationFailure))
+        match BridgeId::of_chain(end_entity, intermediates, now, self.algorithms.all) {
+            Ok(id) if id == self.id => Ok(ServerCertVerified::assertion()),
+            // Another bridge's key signed it: the wrong bridge, or an
+            // impostor at its address.
+            Ok(_) => Err(rustls::Error::InvalidCertificate(rustls::CertificateError::ApplicationVerificationFailure)),
+            // No key vouched for the TLS certificate, or it cannot be read.
+            Err(e) => Err(rustls::Error::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(Arc::new(e))))),
         }
     }
 
@@ -74,7 +90,7 @@ impl ServerCertVerifier for Pinned {
     }
 }
 
-/// The check every caller of the bridge `id` makes of its certificate.
+/// The check every caller of the bridge `id` makes of what it shows.
 pub fn verifier(id: BridgeId) -> Arc<dyn ServerCertVerifier> {
     Arc::new(Pinned { id, algorithms: provider().signature_verification_algorithms })
 }

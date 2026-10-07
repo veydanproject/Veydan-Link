@@ -1,8 +1,9 @@
 //! TLS of the bridge and of the hub. (What a client needs is in `pin`.)
 //!
-//! - A bridge shows the certificate it made itself and asks the caller for
-//!   one without requiring it: a hub shows one signed by the VLink root, a
-//!   client shows none.
+//! - A bridge shows the TLS certificate its key signed, with the
+//!   certificate of that key behind it, and asks the caller for one without
+//!   requiring it: a hub shows one signed by the VLink root, a client
+//!   shows none.
 //! - A hub calls a bridge as a client does, pinned to the bridge's id, and
 //!   shows its certificate. A bridge accepts any hub with a certificate of
 //!   the root, wherever it calls from: that is how hubs change addresses
@@ -10,7 +11,7 @@
 
 use std::sync::Arc;
 
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, UnixTime};
 use rustls::server::WebPkiClientVerifier;
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
 
@@ -24,7 +25,10 @@ pub use crate::pin::server_name;
 pub const ALPN_HUB: &[u8] = b"vlink-hub/1";
 pub const ALPN_HTTP1: &[u8] = b"http/1.1";
 
-/// A certificate with its key, as read from PEM files or just made.
+/// A certificate chain with the key of its first certificate, as read
+/// from PEM files or just made. A bridge's chain is two certificates: the
+/// TLS one, and the one carrying the bridge's key that signed it (`id`).
+/// A hub's is one, signed by the root.
 pub struct Identity {
     pub chain: Vec<CertificateDer<'static>>,
     pub key: PrivateKeyDer<'static>,
@@ -43,9 +47,12 @@ impl Identity {
         Ok(Self { chain, key })
     }
 
-    /// The id a bridge with this certificate has.
-    pub fn bridge_id(&self) -> BridgeId {
-        BridgeId::of_cert(self.chain[0].as_ref())
+    /// The id a bridge with this chain has, held to the rule every caller
+    /// holds it to (`BridgeId::of_chain`) as of now: a chain a client
+    /// would refuse has no id, and a bridge does not start on it.
+    pub fn bridge_id(&self) -> Result<BridgeId, Error> {
+        let now = UnixTime::now();
+        BridgeId::of_chain(&self.chain[0], &self.chain[1..], now, pin::provider().signature_verification_algorithms.all)
     }
 }
 

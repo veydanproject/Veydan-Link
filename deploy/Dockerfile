@@ -5,8 +5,8 @@
 #
 # The image holds one static binary, its licence and the notices of the
 # crates it is built from, nothing else: no shell, no system. /data keeps
-# the bridge's certificate; with the volume gone, the bridge comes back as
-# another bridge.
+# the bridge's key (its id), its TLS key and the certificate chain; with
+# the volume gone, the bridge comes back as another bridge.
 FROM scratch
 LABEL org.opencontainers.image.title="VLink" \
       org.opencontainers.image.description="The VLink bridge: carries Veydan traffic past a throttled border" \

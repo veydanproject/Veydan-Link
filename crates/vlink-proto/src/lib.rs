@@ -1,7 +1,7 @@
 //! What the client, the bridge and the hub share.
 //!
 //! ```text
-//! client ── TLS to the bridge's address, its certificate pinned ── h2 CONNECT host:443
+//! client ── TLS to the bridge's address, its key pinned ───────── h2 CONNECT host:443
 //! bridge ── relays every stream into a link a hub opened ───────── h2 CONNECT host:443
 //! hub    ── lets through the hosts of the manifest only ─────────── TCP to the server
 //! ```

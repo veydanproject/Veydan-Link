@@ -14,6 +14,12 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 cd "$VLINK_DIR"
 
+# The monorepo's build environment points C compilers at the desktop's
+# glibc headers (CFLAGS) and the linker at its libraries (RUSTFLAGS). A
+# static musl build must see none of that: C compiled against glibc 2.38+
+# headers wants __isoc23_sscanf and open64, which musl has not.
+unset CFLAGS CXXFLAGS CPPFLAGS RUSTFLAGS GCC_EXEC_PREFIX
+
 TARGET="${VLINK_TARGET:-x86_64-unknown-linux-musl}"
 ZIG_VERSION="${VLINK_ZIG_VERSION:-0.13.0}"
 ZIG_DIR="$VLINK_TOOLS/zig"

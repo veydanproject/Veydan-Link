@@ -6,6 +6,8 @@ pub enum Error {
     BadId(String),
     #[error("bad bridge address: {0}")]
     BadRef(String),
+    #[error("bad certificate: {0}")]
+    BadCert(String),
     #[error("bad target: {0}")]
     BadTarget(String),
     #[error("tls: {0}")]

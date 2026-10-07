@@ -15,7 +15,7 @@ resolver = "2"
 members = ["crates/vlink-proto", "crates/vlink-client", "crates/vlink"]
 
 [workspace.package]
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 # The newest things used: const `str::split_at` (1.86), `is_multiple_of` (1.87)
 rust-version = "1.87"
@@ -37,6 +37,8 @@ http = "1"
 rcgen = { version = "0.14", default-features = false, features = ["ring", "pem"] }
 ring = "0.17"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# The X.509 parser rustls itself uses, named here for the key a certificate carries.
+webpki = { package = "rustls-webpki", version = "0.103", default-features = false, features = ["ring", "std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
