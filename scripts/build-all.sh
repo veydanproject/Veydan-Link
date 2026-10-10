@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# The bridge for every system somebody may run it on:  make release-all
+# The bridge for the servers it runs on, Linux on both architectures:
+# make release-all
 #
 #   dist/all/vlink-linux-x86_64     static
 #   dist/all/vlink-linux-aarch64    static
-#   dist/all/vlink-windows-x86_64.exe
-#   dist/all/vlink-macos-aarch64
 #   dist/all/SHA256SUMS
 #
 # Everything is compiled here, with zig as the C compiler of each target.
+# The bridge is a server: it is built for Linux alone (the client library
+# still builds for every system the apps run on: make check-targets).
 set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
@@ -25,6 +26,4 @@ build() {  # build <target> <file in target dir> <name in dist/all>
 }
 build x86_64-unknown-linux-musl  vlink     vlink-linux-x86_64
 build aarch64-unknown-linux-musl vlink     vlink-linux-aarch64
-build x86_64-pc-windows-gnu      vlink.exe vlink-windows-x86_64.exe
-build aarch64-apple-darwin       vlink     vlink-macos-aarch64
 (cd dist/all && sha256sum vlink-* > SHA256SUMS && ls -la)

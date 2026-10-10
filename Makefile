@@ -23,7 +23,7 @@ check-targets:
 release:
 	@bash scripts/build-release.sh
 
-# The bridge for Linux, Windows and macOS in dist/all/.
+# The bridge for Linux, x86_64 and aarch64, in dist/all/.
 release-all:
 	@bash scripts/build-all.sh
 

@@ -24,10 +24,13 @@ A server with a public IPv4 address and port 443 free, inside the country
 whose users you want to help:
 
 ```
-docker run -d --name vlink --restart=unless-stopped \
-  --network=host -v vlink:/data rookbeam/vlink
+curl -fsSLO https://raw.githubusercontent.com/veydanproject/Veydan-Link/main/deploy/docker-compose.yml
+docker compose up -d
 ```
 
+(`deploy/docker-compose.yml`: the image, the volume, host networking and
+every setting as a comment; or the one command `docker run -d --name vlink
+--restart=unless-stopped --network=host -v vlink:/data rookbeam/vlink`.)
 That is all. The bridge makes its own key on the first start, tells the
 Veydan registry it exists, and starts carrying traffic once a hub has
 reached it. Nothing to configure, no domain, no certificate to get: the

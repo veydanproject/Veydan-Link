@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 (2026-10-10): the bridge for Linux, the image for both architectures
+
+- The bridge is released for Linux alone, x86_64 and aarch64, static: it
+  is a server. The Windows and macOS builds of the bridge are gone; the
+  client library still builds for every system the apps run on.
+- The image `rookbeam/vlink` holds both architectures, linux/amd64 and
+  linux/arm64, under the version and `latest`.
+- `deploy/docker-compose.yml`: a bridge in one command, with every setting
+  as a comment.
+- This repository holds the sources; the binaries, their `SHA256SUMS` and
+  the image are built and published by the release workflow of the Veydan
+  Project. Nothing of the protocol or of the bridge's behaviour changed.
+
 ## 0.2.0 (2026-10-08): identity v2, the key apart from the certificate
 
 - A bridge has a permanent Ed25519 key (`bridge.key`) of its own and,

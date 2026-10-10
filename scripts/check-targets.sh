@@ -2,7 +2,7 @@
 # Does everything build for the systems it is meant for?  make check-targets
 #
 #   the client library   Windows, macOS, Android (and Linux, by `make test`)
-#   the bridge           Windows, macOS
+#   the bridge           Linux only: it runs on servers (make release-all)
 #   the hub              Linux only: it runs on servers
 #
 # C code of the dependencies (ring) is compiled with zig for Windows and
@@ -45,8 +45,8 @@ android_build() {  # android_build <target> <clang prefix> <packages...>
   fi
 }
 
-zig_build x86_64-pc-windows-gnu vlink-client vlink
-zig_build aarch64-apple-darwin vlink-client vlink
+zig_build x86_64-pc-windows-gnu vlink-client
+zig_build aarch64-apple-darwin vlink-client
 android_build aarch64-linux-android aarch64-linux-android vlink-client
 android_build armv7-linux-androideabi armv7a-linux-androideabi vlink-client
 

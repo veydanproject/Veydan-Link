@@ -40,12 +40,23 @@ fi
 
 fetch_zig() {
   [ "${VLINK_NO_FETCH:-0}" = 1 ] && return 1
-  local arch; arch="$(uname -m)"
-  local name="zig-linux-$arch-$ZIG_VERSION"
+  local arch sha archive name
+  arch="$(uname -m)"
+  # The archives of zig by the sha256 ziglang.org publishes
+  # (https://ziglang.org/download/index.json): nothing unchecked runs here.
+  case "$ZIG_VERSION-$arch" in
+    0.13.0-x86_64) sha=d45312e61ebcc48032b77bc4cf7fd6915c11fa16e4aad116b66c9468211230ea ;;
+    0.13.0-aarch64) sha=041ac42323837eb5624068acd8b00cd5777dac4cf91179e8dad7a7e90dd0c556 ;;
+    *) die "zig $ZIG_VERSION for $arch has no pinned sha256 in scripts/build-release.sh" ;;
+  esac
+  name="zig-linux-$arch-$ZIG_VERSION"
   say "fetching zig $ZIG_VERSION into $ZIG_DIR"
   mkdir -p "$ZIG_DIR"
-  curl -fsSL "https://ziglang.org/download/$ZIG_VERSION/$name.tar.xz" \
-    | tar -xJ -C "$ZIG_DIR" --strip-components=1
+  archive="$(mktemp)"
+  curl -fsSL --proto '=https' "https://ziglang.org/download/$ZIG_VERSION/$name.tar.xz" -o "$archive"
+  echo "$sha  $archive" | sha256sum -c --quiet - || { rm -f "$archive"; die "zig $ZIG_VERSION: the archive is not the pinned one"; }
+  tar -xJ -C "$ZIG_DIR" --strip-components=1 -f "$archive"
+  rm -f "$archive"
 }
 
 [ -x "$ZIG_DIR/zig" ] && export PATH="$ZIG_DIR:$PATH"
@@ -55,7 +66,7 @@ if command -v zig >/dev/null 2>&1 || fetch_zig; then
   export PATH="$ZIG_DIR:$PATH"
   if ! command -v cargo-zigbuild >/dev/null 2>&1; then
     say "installing cargo-zigbuild"
-    cargo install cargo-zigbuild --locked >/dev/null 2>&1 || die "cannot install cargo-zigbuild"
+    cargo install cargo-zigbuild --version 0.23.4 --locked >/dev/null 2>&1 || die "cannot install cargo-zigbuild 0.23.4"
   fi
   builder="zigbuild"
 elif command -v musl-gcc >/dev/null 2>&1; then

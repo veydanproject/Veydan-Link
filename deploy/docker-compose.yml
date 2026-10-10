@@ -1,0 +1,43 @@
+# A VLink bridge in one command, on any Linux server with docker:
+#
+#   curl -fsSLO https://raw.githubusercontent.com/veydanproject/Veydan-Link/main/deploy/docker-compose.yml
+#   docker compose up -d
+#
+# That is all. The bridge makes its own key on the first start, keeps it in
+# the volume `vlink` (back it up: the key is the bridge's identity), tells
+# the Veydan registry it exists and starts carrying traffic once a hub has
+# reached it. Port 443/tcp must be free and open in the firewall.
+#
+#   docker compose logs -f          what it does
+#   docker compose pull && docker compose up -d     the newest release
+#
+# The settings below are the defaults; uncomment one to change it.
+services:
+  vlink:
+    image: rookbeam/vlink:latest
+    container_name: vlink
+    restart: unless-stopped
+    # The bridge listens on the server's own address: no port mapping, and
+    # it sees the real address of every client.
+    network_mode: host
+    volumes:
+      - vlink:/data
+    environment:
+      # Where it listens (443: what looks like a web server from outside).
+      VLINK_LISTEN: ${VLINK_LISTEN:-0.0.0.0:443}
+      # The port the world reaches it at, when a router forwards another.
+      # VLINK_PUBLIC_PORT: "443"
+      # Tell no registry: a bridge for those who are given its reference.
+      # VLINK_PRIVATE: "true"
+      # How many connections at once (the default suits a small server).
+      # VLINK_MAX_CONNECTIONS: "8192"
+      # warn, info, debug
+      # VLINK_LOG: info
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  vlink:
