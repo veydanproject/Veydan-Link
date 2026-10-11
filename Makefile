@@ -29,7 +29,13 @@ release-all:
 
 # The bridge as a docker image.
 IMAGE ?= rookbeam/vlink
+# The agent of the project's monitoring goes into the image beside the
+# node (off unless VEYDAN_AGENT=on): taken from the kit, the build of
+# vagent next to this folder by default:  make image VAGENT=<file>
+VAGENT ?= ../cloud/dist/vagent
 image: release
+	@[ -s "$(VAGENT)" ] || { echo ">> no agent at $(VAGENT): build vagent first, or make image VAGENT=<file>"; exit 1; }
+	@cp "$(VAGENT)" dist/vagent
 	@docker build -q -t $(IMAGE):$$(cut -d- -f1 dist/RELEASE) -t $(IMAGE):latest -f deploy/Dockerfile . >/dev/null
 	@echo ">> $(IMAGE):$$(cut -d- -f1 dist/RELEASE)"
 

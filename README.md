@@ -47,6 +47,25 @@ Veydan app takes, which `docker exec vlink /vlink link --addr <your-ip>:443`
 prints (`veydan://vlink/<id>?a=…`). People paste either into Chat settings →
 Network → Bridges → Add bridge, or tap the link in a message.
 
+## Project monitoring (optional)
+
+The image carries a second, small program: the agent of the project's
+monitoring. It is off unless you turn it on with `-e VEYDAN_AGENT=on` (or
+`VEYDAN_AGENT: "on"` under `environment:` in `docker-compose.yml`). Once
+on, it sends a short report every five minutes to the project's servers,
+signed with the bridge's own key (`bridge.key` in `/data`): the bridge's
+kind, version and uptime, the CPU and memory of the container, its last
+errors (no address of anyone in them), and the results of the checks it
+was asked for. Those checks are only ever two: carrying test bytes
+through a bridge of the project, and asking a relay of the project for
+nothing; the agent refuses any target that is not in the project's signed
+lists. That shows the project how its network looks from where you are.
+It reports nothing about the server beyond the container, nothing about
+who uses the bridge, and never sees
+anyone's messages, files or calls. It opens no port: it only sends out, so
+your firewall and NAT stay as they are. To turn it off, remove the variable
+and start the container again; the bridge works the same either way.
+
 ## What it does and does not see
 
 - **Sees:** the IP address a user connects from, and how much they send.

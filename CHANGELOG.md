@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.2 (2026-10-11): the image carries the agent of the project's monitoring
+
+- The image `rookbeam/vlink` holds a second, small program beside the
+  bridge: the agent of the project's monitoring. It is off unless the one
+  who runs the bridge turns it on (`-e VEYDAN_AGENT=on`); without the
+  switch it hands the process over to the bridge at once, and the bridge
+  runs exactly as it did alone. What it reports once it is on, and what it
+  never sees, is in README.md, "Project monitoring".
+- `make image VAGENT=<file>` names the agent to put into the image.
+- Nothing of the protocol, of the bridge or of the client library changed.
+
 ## 0.2.1 (2026-10-10): the bridge for Linux, the image for both architectures
 
 - The bridge is released for Linux alone, x86_64 and aarch64, static: it
