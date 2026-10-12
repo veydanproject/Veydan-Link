@@ -83,8 +83,7 @@ crates/vlink-proto    the wire protocol: who a bridge is, streams, signed lists
 crates/vlink-client   opening a stream through a bridge (the Veydan app uses this)
 crates/vlink          the bridge itself
 deploy/               the systemd unit and the docker image
-trust/                what is built in: the Veydan root (certificate and key),
-                      the registries, the first bridges
+trust/                what is built in: the Veydan root (certificate and key)
 ```
 
 The hub that bridges connect to is run by the Veydan project and is not

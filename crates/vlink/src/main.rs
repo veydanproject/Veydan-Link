@@ -16,8 +16,8 @@ use vlink_proto::wire::{Bridges, ProbeReport};
 use vlink_proto::{tls, BridgeRef};
 
 /// The certificate of the VLink root, as built into this binary: hubs are
-/// known by it. The root's key, the registries and the seeds are built
-/// into the client, and taken from there (`vlink_client::trust`).
+/// known by it. The root's key is built into the client, and taken from
+/// there (`vlink_client::trust`).
 const ROOT_PEM: &str = include_str!("../../../trust/root.crt");
 
 /// What a probe moves through a bridge each way: past the size at which a
@@ -25,13 +25,10 @@ const ROOT_PEM: &str = include_str!("../../../trust/root.crt");
 const PROBE_BYTES: u64 = 512 * 1024;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(40);
 
-fn built_in_registries() -> Vec<String> {
-    trust::REGISTRIES.iter().map(|r| r.to_string()).collect()
-}
-
-fn built_in_seeds() -> Vec<BridgeRef> {
-    trust::SEEDS.iter().filter_map(|l| l.parse().ok()).collect()
-}
+/// The registry of the Veydan network: where the bridge reports in, and
+/// where the tools ask, when no other is named (`--registry`,
+/// `VLINK_REGISTRY`). A network of one's own names its own.
+const DEFAULT_REGISTRY: &str = trust::DEFAULT_REGISTRY;
 
 #[derive(Parser)]
 #[command(name = "vlink", about = "Veydan bridge", version)]
@@ -56,8 +53,8 @@ struct BridgeArgs {
     /// Connections held at once.
     #[arg(long, env = "VLINK_MAX_CONNECTIONS", default_value_t = 8192)]
     max_connections: usize,
-    /// Registries to report to instead of the built-in ones; several are
-    /// separated by commas.
+    /// Registries to report to instead of the Veydan network's
+    /// (https://hub.veydan.net/vlink); several are separated by commas.
     #[arg(long, env = "VLINK_REGISTRY", value_delimiter = ',')]
     registry: Vec<String>,
     /// Report to no registry: a bridge for those who are told its reference.
@@ -115,7 +112,7 @@ enum Command {
     /// Probe every bridge the registry names and tell it what was found.
     /// Meant to run inside the country the bridges are for.
     Watch {
-        /// The registry, `https://host/vlink`; the built-in one by default.
+        /// The registry, `https://host/vlink`; the Veydan network's by default.
         #[arg(long, env = "VLINK_REGISTRY")]
         registry: Option<String>,
         /// A file with the probe token.
@@ -169,22 +166,29 @@ fn parse_bytes(text: &str) -> anyhow::Result<u64> {
         Some('g') => (&text[..text.len() - 1], 1024 * 1024 * 1024),
         _ => (text.as_str(), 1),
     };
-    let n: u64 = digits.parse().with_context(|| format!("not a size: {text}"))?;
+    let n: u64 = digits
+        .parse()
+        .with_context(|| format!("not a size: {text}"))?;
     Ok(n * scale)
 }
 
 fn rate(bytes: u64, time: Duration) -> String {
     let secs = time.as_secs_f64().max(0.001);
-    format!("{:.2} s, {:.1} Mbit/s", secs, bytes as f64 * 8.0 / secs / 1e6)
+    format!(
+        "{:.2} s, {:.1} Mbit/s",
+        secs,
+        bytes as f64 * 8.0 / secs / 1e6
+    )
 }
 
-fn registry_or_built_in(given: Option<String>) -> anyhow::Result<String> {
-    given.or_else(|| built_in_registries().into_iter().next()).context("no registry is known: --registry")
+fn registry_or_default(given: Option<String>) -> String {
+    given.unwrap_or_else(|| DEFAULT_REGISTRY.to_string())
 }
 
 async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
     let root_pem = match &args.root {
-        Some(path) => std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?,
+        Some(path) => std::fs::read_to_string(path)
+            .with_context(|| format!("cannot read {}", path.display()))?,
         None => ROOT_PEM.to_string(),
     };
     let root = tls::cert_from_pem(&root_pem).context("the root certificate")?;
@@ -204,14 +208,17 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
     )?;
     tracing::info!(listen = %args.listen, %id, "bridge is up");
 
-    let registries = if args.registry.is_empty() { built_in_registries() } else { args.registry.clone() };
+    let registries = if args.registry.is_empty() {
+        vec![DEFAULT_REGISTRY.to_string()]
+    } else {
+        args.registry.clone()
+    };
     if args.private || registries.is_empty() {
         tracing::info!("private bridge: no registry is told");
     } else {
         tokio::spawn(
             Registrar {
                 registries,
-                seeds: built_in_seeds(),
                 id,
                 signer: keys.signer,
                 port: args.public_port.unwrap_or(args.listen.port()),
@@ -253,8 +260,20 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
 /// One round: every bridge the registry names is tried and reported on.
 async fn watch_round(registry: &str, token: &str) -> anyhow::Result<(usize, usize)> {
     let base = registry.trim_end_matches('/');
-    let answer = https::call("GET", &format!("{base}/v1/probe/targets"), Some(token), None, None).await?;
-    anyhow::ensure!(answer.status == 200, "targets: {} {}", answer.status, answer.text());
+    let answer = https::call(
+        "GET",
+        &format!("{base}/v1/probe/targets"),
+        Some(token),
+        None,
+        None,
+    )
+    .await?;
+    anyhow::ensure!(
+        answer.status == 200,
+        "targets: {} {}",
+        answer.status,
+        answer.text()
+    );
     let targets: Bridges = serde_json::from_slice(&answer.body)?;
     let mut good = 0;
     for bridge in &targets.bridges {
@@ -264,13 +283,22 @@ async fn watch_round(registry: &str, token: &str) -> anyhow::Result<(usize, usiz
         let result = tokio::time::timeout(PROBE_TIMEOUT, probe::run(&client, PROBE_BYTES)).await;
         let ok = matches!(result, Ok(Ok(_)));
         match &result {
-            Ok(Ok(r)) => tracing::info!(bridge = %bridge.addr, down = ?r.down, up = ?r.up, "bridge carries bytes"),
+            Ok(Ok(r)) => {
+                tracing::info!(bridge = %bridge.addr, down = ?r.down, up = ?r.up, "bridge carries bytes")
+            }
             Ok(Err(e)) => tracing::warn!(bridge = %bridge.addr, error = %e, "bridge failed"),
             Err(_) => tracing::warn!(bridge = %bridge.addr, "bridge stalled"),
         }
         good += usize::from(ok);
         let body = serde_json::to_vec(&ProbeReport { id: bridge.id, ok })?;
-        let reported = https::call("POST", &format!("{base}/v1/probe/report"), Some(token), Some(&body), None).await;
+        let reported = https::call(
+            "POST",
+            &format!("{base}/v1/probe/report"),
+            Some(token),
+            Some(&body),
+            None,
+        )
+        .await;
         match reported {
             Ok(a) if a.status < 300 => {}
             Ok(a) => tracing::warn!(status = a.status, "report was not taken"),
@@ -284,22 +312,49 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         None => run_bridge(cli.bridge).await,
         Some(Command::Bridge(args)) => run_bridge(args).await,
-        Some(Command::Id { data, addr, renew_cert }) => {
-            let keys = if renew_cert { identity::renew(&data)? } else { identity::load_or_create(&data)? };
+        Some(Command::Id {
+            data,
+            addr,
+            renew_cert,
+        }) => {
+            let keys = if renew_cert {
+                identity::renew(&data)?
+            } else {
+                identity::load_or_create(&data)?
+            };
             let id = keys.id;
             match addr {
-                Some(addr) => println!("{}", BridgeRef { addr, id, sni: None }),
+                Some(addr) => println!(
+                    "{}",
+                    BridgeRef {
+                        addr,
+                        id,
+                        sni: None
+                    }
+                ),
                 None => println!("{id}"),
             }
             Ok(())
         }
         Some(Command::Link { data, addr }) => {
             let id = identity::load_or_create(&data)?.id;
-            println!("{}", bridge_link(&BridgeRef { addr, id, sni: None }));
+            println!(
+                "{}",
+                bridge_link(&BridgeRef {
+                    addr,
+                    id,
+                    sni: None
+                })
+            );
             Ok(())
         }
-        Some(Command::Client { bridges, socks: addr }) => {
-            let listener = TcpListener::bind(addr).await.with_context(|| format!("cannot listen on {addr}"))?;
+        Some(Command::Client {
+            bridges,
+            socks: addr,
+        }) => {
+            let listener = TcpListener::bind(addr)
+                .await
+                .with_context(|| format!("cannot listen on {addr}"))?;
             tracing::info!(socks = %addr, bridges = bridges.bridges.len(), "client is up");
             let client = Client::new(bridges.bridges);
             tokio::select! {
@@ -310,7 +365,10 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         }
         Some(Command::Probe { bridges, bytes }) => {
             let bytes = parse_bytes(&bytes)?;
-            anyhow::ensure!(bytes > 0 && bytes <= probe::MAX_BYTES, "between 1 byte and 1g");
+            anyhow::ensure!(
+                bytes > 0 && bytes <= probe::MAX_BYTES,
+                "between 1 byte and 1g"
+            );
             let client = Client::new(bridges.bridges);
             let report = probe::run(&client, bytes).await?;
             if let Some(bridge) = client.current().await {
@@ -321,8 +379,13 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             println!("up      {}", rate(report.bytes, report.up));
             Ok(())
         }
-        Some(Command::Watch { registry, token_file, every, once }) => {
-            let registry = registry_or_built_in(registry)?;
+        Some(Command::Watch {
+            registry,
+            token_file,
+            every,
+            once,
+        }) => {
+            let registry = registry_or_default(registry);
             let token = std::fs::read_to_string(&token_file)
                 .with_context(|| format!("cannot read {}", token_file.display()))?
                 .trim()
@@ -340,18 +403,26 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             }
         }
         Some(Command::List { registry, via }) => {
-            let registry = registry_or_built_in(registry)?;
+            let registry = registry_or_default(registry);
             let url = format!("{}/v1/list", registry.trim_end_matches('/'));
             let through = via.map(|bridge| Client::new(vec![bridge]));
             let answer = https::call("GET", &url, None, None, through.as_ref()).await?;
             anyhow::ensure!(answer.status == 200, "{} {}", answer.status, answer.text());
             let signed: SignedList = serde_json::from_slice(&answer.body)?;
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
-            let list = signed.verify(trust::ROOT_PUB, now).context("the list is not the registry's")?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs();
+            let list = signed
+                .verify(trust::ROOT_PUB, now)
+                .context("the list is not the registry's")?;
             for bridge in &list.bridges {
                 println!("{bridge}");
             }
-            eprintln!("{} bridge(s), signatures hold, good until unix {}", list.bridges.len(), list.expires_at);
+            eprintln!(
+                "{} bridge(s), signatures hold, good until unix {}",
+                list.bridges.len(),
+                list.expires_at
+            );
             Ok(())
         }
     }
@@ -359,10 +430,19 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
 
 fn main() -> ExitCode {
     // VLINK_LOG=debug shows every stream; the default says who came and went.
-    let level = std::env::var("VLINK_LOG").ok().and_then(|l| l.parse().ok()).unwrap_or(tracing::Level::INFO);
-    tracing_subscriber::fmt().with_max_level(level).with_writer(std::io::stderr).init();
+    let level = std::env::var("VLINK_LOG")
+        .ok()
+        .and_then(|l| l.parse().ok())
+        .unwrap_or(tracing::Level::INFO);
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_writer(std::io::stderr)
+        .init();
     let cli = Cli::parse();
-    let runtime = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt,
         Err(e) => {
             eprintln!("vlink: {e}");
@@ -388,9 +468,17 @@ mod tests {
     fn the_link_is_a_vlink_link_the_app_takes() {
         // The app reads these back (`messenger-links::bridge::tests`). The
         // word `bridge` is kept for bridges to other networks.
-        let v4: BridgeRef = format!("45.93.201.244:443#{ID}").parse().unwrap();
-        assert_eq!(bridge_link(&v4), format!("veydan://vlink/{ID}?a=45.93.201.244%3A443"));
-        let v6: BridgeRef = format!("[2001:db8::1]:8443#{}", ID.to_uppercase()).parse().unwrap();
-        assert_eq!(bridge_link(&v6), format!("veydan://vlink/{ID}?a=%5B2001%3Adb8%3A%3A1%5D%3A8443"));
+        let v4: BridgeRef = format!("203.0.113.7:443#{ID}").parse().unwrap();
+        assert_eq!(
+            bridge_link(&v4),
+            format!("veydan://vlink/{ID}?a=203.0.113.7%3A443")
+        );
+        let v6: BridgeRef = format!("[2001:db8::1]:8443#{}", ID.to_uppercase())
+            .parse()
+            .unwrap();
+        assert_eq!(
+            bridge_link(&v6),
+            format!("veydan://vlink/{ID}?a=%5B2001%3Adb8%3A%3A1%5D%3A8443")
+        );
     }
 }

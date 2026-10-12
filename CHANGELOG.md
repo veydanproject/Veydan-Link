@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 (2026-10-12): nothing built in but the root key
+
+- `trust/registries.txt` and `trust/seeds.txt` are gone, and with them
+  `vlink_client::trust::SEEDS`. The client library builds in the key of
+  the VLink root alone. Where a client starts — the registries of bridges
+  and of call nodes, the first bridges before any list was fetched — is
+  named by the signed manifest of the app's network (`registries`,
+  `bridges`), not by the code: a registry or a bridge moves with a new
+  manifest, not with a release of every app.
+- The bridge reports to `https://hub.veydan.net/vlink`, the registry of
+  the Veydan network, when neither `--registry` nor `VLINK_REGISTRY` names
+  another (`vlink_client::trust::DEFAULT_REGISTRY`); a network of one's
+  own names its own. `vlink watch` and `vlink list` ask the same one by
+  default. The registry built in before was the old address
+  `eu-1-vpush.veydan.net`. `trust::REGISTRIES` is that one registry as a
+  list, for the project's server tools; the app does not read it.
+- A bridge reports to the registry directly, and only so: the way around
+  through a built-in bridge, when the direct way failed, is removed with
+  the built-in bridges. A report is a few hundred bytes and passes a way
+  that is throttled past a few kilobytes.
+- The protocol is unchanged: bridges, hubs, the registry and clients of
+  0.2 and 0.3 work together.
+
 ## 0.2.2 (2026-10-11): the image carries the agent of the project's monitoring
 
 - The image `rookbeam/vlink` holds a second, small program beside the

@@ -29,6 +29,8 @@ services:
       # VLINK_PUBLIC_PORT: "443"
       # Tell no registry: a bridge for those who are given its reference.
       # VLINK_PRIVATE: "true"
+      # The registry it reports to: the Veydan network's, or one of your own.
+      # VLINK_REGISTRY: https://hub.veydan.net/vlink
       # How many connections at once (the default suits a small server).
       # VLINK_MAX_CONNECTIONS: "8192"
       # warn, info, debug
