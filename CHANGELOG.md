@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 (2026-10-13): the README says how to install
+
+- README.md: what a bridge needs, both ways to install it (as a service by
+  one command, without docker; in docker), what happens after the install
+  and how to see it in the log, every setting, update, move and removal.
+- Nothing of the bridge, of the client library or of the protocol changed.
+
 ## 0.3.0 (2026-10-12): nothing built in but the root key
 
 - `trust/registries.txt` and `trust/seeds.txt` are gone, and with them
