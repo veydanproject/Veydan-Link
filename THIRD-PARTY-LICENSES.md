@@ -89,7 +89,7 @@ copy of the bridge: next to the binaries of each release and as
 | rcgen | 0.14.10 | MIT OR Apache-2.0 |
 | ring | 0.17.14 | Apache-2.0 AND ISC |
 | rusticata-macros | 4.1.0 | MIT OR Apache-2.0 |
-| rustls | 0.23.45 | Apache-2.0 OR ISC OR MIT |
+| rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 |
 | rustls-webpki | 0.103.15 | ISC |
 | serde | 1.0.229 | MIT OR Apache-2.0 |

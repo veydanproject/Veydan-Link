@@ -9,7 +9,7 @@ use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
 use tokio::net::TcpListener;
 use vlink::register::Registrar;
-use vlink::{https, identity, Bridge, Config};
+use vlink::{https, identity, revoked, Bridge, Config};
 use vlink_client::{probe, socks, trust, Client};
 use vlink_proto::list::SignedList;
 use vlink_proto::wire::{Bridges, ProbeReport};
@@ -24,6 +24,8 @@ const ROOT_PEM: &str = include_str!("../../../trust/root.crt");
 /// throttled path stalls.
 const PROBE_BYTES: u64 = 512 * 1024;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(40);
+/// How often a running bridge looks whether its chain is to be issued again.
+const CERT_CHECK_EVERY: Duration = Duration::from_secs(12 * 3600);
 
 /// The registry of the Veydan network: where the bridge reports in, and
 /// where the tools ask, when no other is named (`--registry`,
@@ -194,6 +196,7 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
     let root = tls::cert_from_pem(&root_pem).context("the root certificate")?;
     let keys = identity::load_or_create(&args.data)?;
     let id = keys.id;
+    let revoked = revoked::Store::open(&args.data, &root)?;
     let listener = TcpListener::bind(args.listen)
         .await
         .with_context(|| format!("cannot listen on {}", args.listen))?;
@@ -206,7 +209,30 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
             link_test_bytes: vlink::LINK_TEST_BYTES,
         },
     )?;
+    // What a registry said before the restart holds until it says more.
+    bridge.handle().set_revoked(revoked.keys());
     tracing::info!(listen = %args.listen, %id, "bridge is up");
+
+    // The chain is good for 90 days: issued again a month before its end
+    // over the same keys, and shown from the next handshake on.
+    let handle = bridge.handle();
+    let data = args.data.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(CERT_CHECK_EVERY);
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            match identity::renew_if_due(&data) {
+                Ok(Some(keys)) => {
+                    if let Err(e) = handle.set_identity(keys.tls) {
+                        tracing::warn!(error = %format!("{e:#}"), "the new certificate is not shown: restart the bridge");
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => tracing::warn!(error = %format!("{e:#}"), "the certificate was not issued again"),
+            }
+        }
+    });
 
     let registries = if args.registry.is_empty() {
         vec![DEFAULT_REGISTRY.to_string()]
@@ -224,6 +250,7 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
                 port: args.public_port.unwrap_or(args.listen.port()),
                 public_ip: args.public_ip,
                 handle: bridge.handle(),
+                revoked,
             }
             .run(),
         );
@@ -243,6 +270,7 @@ async fn run_bridge(args: BridgeArgs) -> anyhow::Result<()> {
                 streams = s.streams,
                 no_hub = s.refused_no_hub,
                 hubs_refused = s.links_refused,
+                hubs_revoked = s.hubs_revoked,
                 up = s.bytes_up,
                 down = s.bytes_down,
                 "status"

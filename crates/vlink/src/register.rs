@@ -8,6 +8,11 @@
 //! the registry takes an address for the bridge's id from nobody else, and
 //! not from a report kept and sent again later.
 //!
+//! The answer may carry the list of revoked hubs (`vlink_proto::revoke`):
+//! the bridge keeps the newest the root stands behind (`revoked`) and
+//! drops the links of the hubs on it. A bridge that tells no registry
+//! (`--private`) learns of no revocation.
+//!
 //! A report is a few hundred bytes. It goes straight to the registry: a
 //! request that small passes even a way throttled past a few kilobytes.
 //! There is no way around through another bridge: no bridge is built into
@@ -16,10 +21,12 @@
 use std::net::IpAddr;
 use std::time::Duration;
 
+use vlink_proto::revoke::Revocations;
 use vlink_proto::sign::Signer;
 use vlink_proto::wire::{Registered, Registration, State};
 use vlink_proto::BridgeId;
 
+use crate::revoked::Store;
 use crate::{https, Handle};
 
 /// Between reports, once the registry knows the bridge.
@@ -39,11 +46,13 @@ pub struct Registrar {
     /// reaches it at.
     pub public_ip: Option<IpAddr>,
     pub handle: Handle,
+    /// The hubs revoked: each answer may carry a newer list.
+    pub revoked: Store,
 }
 
 impl Registrar {
     /// Reports for as long as the bridge runs.
-    pub async fn run(self) {
+    pub async fn run(mut self) {
         let mut known: Option<State> = None;
         tokio::time::sleep(Duration::from_secs(2)).await;
         loop {
@@ -55,6 +64,9 @@ impl Registrar {
                         if known != Some(reply.state) {
                             tracing::info!(%registry, state = ?reply.state, addr = %reply.addr, "registry knows this bridge");
                             known = Some(reply.state);
+                        }
+                        if let Some(list) = &reply.revoked {
+                            take_revoked(&mut self.revoked, &self.handle, registry, list);
                         }
                     }
                     Err(e) => {
@@ -88,5 +100,21 @@ impl Registrar {
         let answer = https::call("POST", &url, None, Some(&body), None).await?;
         anyhow::ensure!(answer.status == 200, "{} {}", answer.status, answer.text());
         Ok(serde_json::from_slice(&answer.body)?)
+    }
+}
+
+/// A list of revoked hubs a registry gave: kept when it is the root's word
+/// and newer than the one kept, and put in force at once; the links of the
+/// hubs on it are dropped. A list that does not hold changes nothing.
+fn take_revoked(store: &mut Store, handle: &Handle, registry: &str, list: &Revocations) {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    match store.take(list, now) {
+        Ok(true) => {
+            let keys = store.keys();
+            tracing::info!(%registry, revoked = keys.len(), "the list of revoked hubs changed");
+            handle.set_revoked(keys);
+        }
+        Ok(false) => {}
+        Err(e) => tracing::warn!(%registry, error = %format!("{e:#}"), "the list of revoked hubs was not taken"),
     }
 }

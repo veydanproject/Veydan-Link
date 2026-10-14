@@ -14,6 +14,7 @@ use ring::signature::{UnparsedPublicKey, ED25519};
 use serde::{Deserialize, Serialize};
 
 use crate::list::unhex;
+use crate::revoke::Revocations;
 use crate::{BridgeId, BridgeRef};
 
 /// What is signed is prefixed with what it is, so that a signature made
@@ -113,6 +114,11 @@ pub struct Registered {
     pub state: State,
     /// The address the registry has for the bridge.
     pub addr: SocketAddr,
+    /// The hubs revoked, signed under the root (`revoke`). A registry
+    /// that never revoked one, or is older than the field, sends none; a
+    /// bridge older than the field reads past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoked: Option<Revocations>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -124,4 +130,42 @@ pub struct Bridges {
 pub struct ProbeReport {
     pub id: BridgeId,
     pub ok: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_answer_without_revocations_is_read_as_before() {
+        // What every registry before the field sent.
+        let old: Registered = serde_json::from_str(r#"{"state":"verified","addr":"203.0.113.7:443"}"#).unwrap();
+        assert_eq!(old, Registered { state: State::Verified, addr: "203.0.113.7:443".parse().unwrap(), revoked: None });
+        // And a registry with nothing revoked sends the same text.
+        assert_eq!(serde_json::to_string(&old).unwrap(), r#"{"state":"verified","addr":"203.0.113.7:443"}"#);
+    }
+
+    #[test]
+    fn a_bridge_before_the_field_reads_past_it() {
+        // The answer as a bridge before the field read it: two fields, and
+        // nothing that refuses others.
+        #[derive(Deserialize)]
+        struct Before {
+            state: State,
+            addr: SocketAddr,
+        }
+        let rng = ring::rand::SystemRandom::new();
+        let key = || {
+            crate::sign::Signer::from_pkcs8(ring::signature::Ed25519KeyPair::generate_pkcs8(&rng).unwrap().as_ref()).unwrap()
+        };
+        let (root, list_key) = (key(), key());
+        let delegation = root.delegate(&list_key.public_hex(), 10_000);
+        let revoked = list_key.sign_revocations(vec!["ab".repeat(32)], 1_000, &delegation);
+        let now = Registered { state: State::Active, addr: "203.0.113.7:443".parse().unwrap(), revoked: Some(revoked) };
+        let text = serde_json::to_string(&now).unwrap();
+        let before: Before = serde_json::from_str(&text).unwrap();
+        assert_eq!((before.state, before.addr), (State::Active, now.addr));
+        let back: Registered = serde_json::from_str(&text).unwrap();
+        assert_eq!(back, now);
+    }
 }

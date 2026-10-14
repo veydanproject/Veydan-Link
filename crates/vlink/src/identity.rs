@@ -16,6 +16,14 @@
 //! `bridge.crt` holds the certificate over the TLS key, signed by the
 //! bridge's key, and behind it the certificate carrying the bridge's key:
 //! the chain the bridge shows, as `vlink_proto::pin` checks it.
+//!
+//! The chain looks like that of any server with a certificate of 90
+//! days: names made up for each chain, not `localhost`, and dates of 90
+//! days, issued again over the same two keys a month before the end, at
+//! the start and while the bridge runs, as certbot renews. Who knows the
+//! bridge pins its key, not the fields, so the id holds across each new
+//! chain. That no public authority signed it still shows to whoever
+//! completes a handshake (spec/protocol.md, «Порт моста»).
 
 use std::path::Path;
 
@@ -62,14 +70,23 @@ pub fn generate_tls_key() -> anyhow::Result<String> {
     Ok(KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)?.serialize_pem())
 }
 
+/// How long a chain is issued for: as long as a certificate of Let's
+/// Encrypt, rather than the twenty years nobody but a bridge would set.
+pub const CERT_DAYS: u64 = 90;
+/// A chain with less than this left is issued again, at the start and
+/// while the bridge runs (`renew_if_due`), as certbot renews.
+pub const RENEW_BEFORE_DAYS: u64 = 30;
+
 /// What the certificate carrying the bridge's key says. The TLS
 /// certificate names it as its issuer, so the same words are needed for
-/// both. The fields are what a server set up in a hurry would have.
-fn issuer_params() -> anyhow::Result<CertificateParams> {
+/// both. The name is made up anew for each chain: a fixed one, or one
+/// derived from the key, would tell every chain of a bridge apart from
+/// the chains of anybody else.
+fn issuer_params(name: &str) -> anyhow::Result<CertificateParams> {
     let mut params = CertificateParams::new(Vec::<String>::new())?;
-    let mut name = DistinguishedName::new();
-    name.push(DnType::CommonName, "localhost");
-    params.distinguished_name = name;
+    let mut dn = DistinguishedName::new();
+    dn.push(DnType::CommonName, name);
+    params.distinguished_name = dn;
     params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::DigitalSignature];
     params.serial_number = Some(serial()?);
@@ -83,33 +100,73 @@ fn serial() -> anyhow::Result<SerialNumber> {
     Ok(SerialNumber::from(serial.to_vec()))
 }
 
+/// A host name of nobody: a few syllables and a common ending,
+/// `kesomara.net`. Those who call the bridge look at its key only.
+fn made_up_name() -> anyhow::Result<String> {
+    const CONSONANTS: &[u8] = b"bdfgklmnprstvz";
+    const VOWELS: &[u8] = b"aeiou";
+    const ENDINGS: &[&str] = &["com", "net", "org", "io", "dev", "app"];
+    let mut random = [0u8; 10];
+    ring_random(&mut random)?;
+    let syllables = 2 + usize::from(random[0] % 3);
+    let mut name = String::new();
+    for i in 0..syllables {
+        name.push(CONSONANTS[usize::from(random[1 + 2 * i]) % CONSONANTS.len()] as char);
+        name.push(VOWELS[usize::from(random[2 + 2 * i]) % VOWELS.len()] as char);
+    }
+    Ok(format!("{name}.{}", ENDINGS[usize::from(random[9]) % ENDINGS.len()]))
+}
+
 /// The dates of the day: a day back, as the clocks of two machines never
-/// quite agree, to twenty years on.
+/// quite agree, to [`CERT_DAYS`] on.
 fn dates(params: &mut CertificateParams) {
     let now = std::time::SystemTime::now();
     params.not_before = (now - std::time::Duration::from_secs(86_400)).into();
-    params.not_after = (now + std::time::Duration::from_secs(20 * 365 * 86_400)).into();
+    params.not_after = (now + std::time::Duration::from_secs(CERT_DAYS * 86_400)).into();
 }
 
 /// The chain over `tls_key_pem`, signed by `key_pem`, as PEM: the TLS
 /// certificate first, the certificate carrying the bridge's key behind
 /// it. Nobody else signs anything, and nothing in either is checked by
 /// those who know the bridge but the signature and the dates. Each chain
-/// issued is new: its own serials, the dates of its day.
+/// issued is new: its own serials and names, the dates of its day.
 pub fn certificate(key_pem: &str, tls_key_pem: &str) -> anyhow::Result<String> {
     let key = key_of(key_pem)?;
     let tls_key = tls_key_of(tls_key_pem)?;
-    let params = issuer_params()?;
+    let params = issuer_params(&made_up_name()?)?;
     let own = params.self_signed(&key)?;
     let issuer = Issuer::new(params, key);
-    let mut params = CertificateParams::new(vec!["localhost".to_string()])?;
+    let host = made_up_name()?;
+    let mut params = CertificateParams::new(vec![host.clone()])?;
     let mut name = DistinguishedName::new();
-    name.push(DnType::CommonName, "localhost");
+    name.push(DnType::CommonName, host);
     params.distinguished_name = name;
     params.serial_number = Some(serial()?);
     dates(&mut params);
     let tls = params.signed_by(&tls_key, &issuer)?;
     Ok(format!("{}{}", tls.pem(), own.pem()))
+}
+
+/// Whether the chain (PEM) has to be issued again at `now` (unix
+/// seconds): its TLS certificate has less than [`RENEW_BEFORE_DAYS`]
+/// left, or runs well past [`CERT_DAYS`] from now (the twenty years
+/// bridges used to set), or cannot be read.
+pub fn due(chain_pem: &str, now: u64) -> bool {
+    match vlink_proto::tls::cert_from_pem(chain_pem) {
+        Ok(der) => due_der(der.as_ref(), now),
+        Err(_) => true,
+    }
+}
+
+fn due_der(der: &[u8], now: u64) -> bool {
+    match vlink_proto::tls::not_after(der) {
+        Some(at) => at < now + RENEW_BEFORE_DAYS * 86_400 || at > now + (CERT_DAYS + 2) * 86_400,
+        None => true,
+    }
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 /// A fresh bridge: both keys and the chain over them.
@@ -202,7 +259,51 @@ pub fn load_or_create(dir: &Path) -> anyhow::Result<Keys> {
         write_cert(&cert_path, &certificate(&key, &tls_key)?)?;
     }
     let chain = std::fs::read_to_string(&cert_path).with_context(|| format!("cannot read {}", cert_path.display()))?;
+    let chain = reissue_if_due(&cert_path, &key, &tls_key, chain, unix_now())?.0;
     Pem { chain, tls_key, key }.keys().with_context(|| format!("{}", cert_path.display()))
+}
+
+/// The chain issued again over the same two keys when it is [`due`] and
+/// is the bridge's own (the certificate behind the TLS one carries the
+/// bridge's key): `(chain, whether it is new)`. A chain of somebody
+/// else's is left for [`Pem::keys`] to refuse. The id and the TLS key
+/// stay; only the dates, names and serials are new.
+fn reissue_if_due(cert_path: &Path, key: &str, tls_key: &str, chain: String, now: u64) -> anyhow::Result<(String, bool)> {
+    if !due(&chain, now) || !carries_key(&chain, key) {
+        return Ok((chain, false));
+    }
+    let chain = certificate(key, tls_key)?;
+    write_cert(cert_path, &chain)?;
+    tracing::info!(file = %cert_path.display(), days = CERT_DAYS, "the certificate of the bridge was issued again");
+    Ok((chain, true))
+}
+
+/// Whether the second certificate of the chain carries the bridge's key.
+fn carries_key(chain_pem: &str, key_pem: &str) -> bool {
+    use vlink_proto::rustls_types::pem::PemObject;
+    use vlink_proto::rustls_types::CertificateDer;
+    let Ok(id) = id_of_key(key_pem) else { return false };
+    CertificateDer::pem_slice_iter(chain_pem.as_bytes())
+        .nth(1)
+        .and_then(|c| c.ok())
+        .and_then(|c| BridgeId::of_cert(c.as_ref()).ok())
+        == Some(id)
+}
+
+/// The chain kept in `dir` issued again when it is [`due`]: the keys of
+/// the new one, to be shown from now on, or `None` when nothing changed.
+/// What a running bridge asks now and then, as certbot renews.
+pub fn renew_if_due(dir: &Path) -> anyhow::Result<Option<Keys>> {
+    let read = |name: &str| {
+        let path = dir.join(name);
+        std::fs::read_to_string(&path).with_context(|| format!("cannot read {}", path.display()))
+    };
+    let (key, tls_key, chain) = (read(KEY_FILE)?, read(TLS_KEY_FILE)?, read(CERT_FILE)?);
+    let (chain, new) = reissue_if_due(&dir.join(CERT_FILE), &key, &tls_key, chain, unix_now())?;
+    if !new {
+        return Ok(None);
+    }
+    Pem { chain, tls_key, key }.keys().map(Some)
 }
 
 /// A new TLS key and a new chain over it in place of those kept in `dir`.
@@ -349,5 +450,89 @@ mod tests {
         // Neither kind serves as the other.
         assert!(certificate(&pem.tls_key, &pem.key).is_err());
         assert!(certificate(&pem.key, &pem.key).is_err());
+    }
+
+    fn ders(chain: &str) -> Vec<Vec<u8>> {
+        use vlink_proto::rustls_types::pem::PemObject;
+        use vlink_proto::rustls_types::CertificateDer;
+        CertificateDer::pem_slice_iter(chain.as_bytes()).map(|c| c.unwrap().as_ref().to_vec()).collect()
+    }
+
+    #[test]
+    fn a_chain_lives_ninety_days_under_a_name_of_nobody() {
+        let now = unix_now();
+        let pem = generate().unwrap();
+        let chain = ders(&pem.chain);
+        for der in &chain {
+            let end = vlink_proto::tls::not_after(der).unwrap();
+            assert!(end.abs_diff(now + CERT_DAYS * 86_400) < 60, "{end} is not {CERT_DAYS} days on");
+            // No `localhost`: what a server set up in a hurry says.
+            assert!(!der.windows(9).any(|w| w == b"localhost"));
+        }
+        assert!(!due(&pem.chain, now));
+        // Each chain its own names.
+        let other = certificate(&pem.key, &pem.tls_key).unwrap();
+        assert_ne!(ders(&other)[0], chain[0]);
+        for _ in 0..50 {
+            let name = made_up_name().unwrap();
+            let (label, ending) = name.split_once('.').unwrap();
+            assert!((4..=8).contains(&label.len()) && label.bytes().all(|b| b.is_ascii_lowercase()), "{name}");
+            assert!(["com", "net", "org", "io", "dev", "app"].contains(&ending), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_chain_near_its_end_is_issued_again_and_the_bridge_stays_the_same() {
+        let dir = temp_dir("due");
+        let first = load_or_create(&dir).unwrap();
+        let chain = std::fs::read_to_string(dir.join(CERT_FILE)).unwrap();
+        let tls_key = std::fs::read_to_string(dir.join(TLS_KEY_FILE)).unwrap();
+        let key = std::fs::read_to_string(dir.join(KEY_FILE)).unwrap();
+        // Not due today: nothing changes.
+        assert!(renew_if_due(&dir).unwrap().is_none());
+        assert_eq!(std::fs::read_to_string(dir.join(CERT_FILE)).unwrap(), chain);
+
+        // Seventy days on, twenty are left: issued again, over the same two
+        // keys. The id, which every client and hub pins, is the same; the
+        // TLS key too; only the certificates are new.
+        let later = unix_now() + 70 * 86_400;
+        assert!(due(&chain, later));
+        let (renewed, new) = reissue_if_due(&dir.join(CERT_FILE), &key, &tls_key, chain.clone(), later).unwrap();
+        assert!(new);
+        assert_ne!(renewed, chain);
+        assert_eq!(std::fs::read_to_string(dir.join(CERT_FILE)).unwrap(), renewed);
+        assert_eq!(std::fs::read_to_string(dir.join(TLS_KEY_FILE)).unwrap(), tls_key);
+        let keys = Pem { chain: renewed.clone(), tls_key: tls_key.clone(), key: key.clone() }.keys().unwrap();
+        assert_eq!(keys.id, first.id);
+        // As the pin of a caller checks it: the TLS certificate signed by
+        // the key whose hash is the id, in its dates.
+        let algorithms = vlink_proto::pin::provider().signature_verification_algorithms.all;
+        let chain_der = keys.tls.chain.clone();
+        let at = vlink_proto::rustls_types::UnixTime::now();
+        assert_eq!(BridgeId::of_chain(&chain_der[0], &chain_der[1..], at, algorithms).unwrap(), first.id);
+        assert_eq!(load_or_create(&dir).unwrap().id, first.id);
+
+        // A chain of twenty years, as bridges made before: issued again at
+        // the start (seen here from seventy days back, when this one runs
+        // well past ninety days).
+        assert!(due(&renewed, unix_now() - 70 * 86_400));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_due_chain_of_somebody_else_is_not_issued_again_but_refused() {
+        let dir = temp_dir("due-other");
+        load_or_create(&dir).unwrap();
+        let other = generate().unwrap();
+        std::fs::write(dir.join(CERT_FILE), &other.chain).unwrap();
+        let key = std::fs::read_to_string(dir.join(KEY_FILE)).unwrap();
+        let tls_key = std::fs::read_to_string(dir.join(TLS_KEY_FILE)).unwrap();
+        let later = unix_now() + 70 * 86_400;
+        let (kept, new) = reissue_if_due(&dir.join(CERT_FILE), &key, &tls_key, other.chain.clone(), later).unwrap();
+        assert!(!new);
+        assert_eq!(kept, other.chain);
+        let err = format!("{:#}", load_or_create(&dir).err().expect("refused"));
+        assert!(err.contains("--renew-cert"), "{err}");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

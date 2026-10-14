@@ -15,7 +15,7 @@ resolver = "2"
 members = ["crates/vlink-proto", "crates/vlink-client", "crates/vlink"]
 
 [workspace.package]
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 # The newest thing used: `is_multiple_of` (1.87)
 rust-version = "1.87"

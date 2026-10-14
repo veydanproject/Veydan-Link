@@ -169,6 +169,8 @@ docker logs -f vlink            # docker
 | `status hubs=1 clients=… streams=…`, every minute | the hubs connected now, and what the bridge carries |
 | `registry was not told` | this server cannot reach the registry; it tries again by itself |
 | `hub refused: its link does not carry bytes` | the way between this server and that hub is throttled; the bridge is used through other hubs, or not at all from this network |
+| `the list of revoked hubs changed` | the registry named a hub that is not to be let in any more (its key was stolen, say); the bridge keeps it out, and drops its link if it had one |
+| `a revoked hub was turned away` | such a hub called; nothing to do |
 
 If it stays `New` for more than a few minutes, the port is not reachable
 from outside: open it at your provider. Behind a NAT or a forwarded port,
@@ -200,7 +202,7 @@ with `-e`.
 | Variable | Default | What |
 |---|---|---|
 | `VLINK_LISTEN` | `0.0.0.0:443` | the address and port to listen on |
-| `VLINK_DATA` | `data` (`/opt/vlink/data`, `/data` in the image) | where the bridge keeps its key and certificate |
+| `VLINK_DATA` | `data` (`/opt/vlink/data`, `/data` in the image) | where the bridge keeps its key, its certificate and the list of revoked hubs (`revoked.json`) |
 | `VLINK_PRIVATE` | `false` | `true`: report to no registry |
 | `VLINK_PUBLIC_IP` | the address its reports come from | the address the world reaches this machine at, when it is another one |
 | `VLINK_PUBLIC_PORT` | the port it listens on | the port the world reaches the bridge at, when it is another one (a container, a forwarded port) |
@@ -214,12 +216,19 @@ with `-e`.
 - **Update.** A service: the same install command again; it replaces the
   program when a newer release is out and keeps the key and the settings.
   Docker: `docker pull rookbeam/vlink`, then remove the container and run
-  it again (`docker compose pull && docker compose up -d`).
+  it again (`docker compose pull && docker compose up -d`). Please update
+  when a release is out: a bridge learns from the registry which hubs are
+  not to be let in any more (a hub whose key was stolen) only from the
+  release that follows 0.3.1 on; an older one keeps taking such a hub until
+  its certificate runs out.
 - **Move to another server.** Copy `/opt/vlink/data` (or the volume) and
   install there. The id stays; at a new address the registry checks the
   bridge again, and a network that approves by hand approves it again.
-- **A new certificate.** The TLS key and certificate beside the key may be
-  replaced at any time: `vlink id --renew-cert` (a service:
+- **A new certificate.** The bridge issues its certificate for 90 days and
+  issues it again by itself a month before the end (the log says `the
+  certificate of the bridge was issued again`); nothing is to be done. The
+  TLS key and certificate beside the key may also be replaced at any time:
+  `vlink id --renew-cert` (a service:
   `runuser -u vlink -- /opt/vlink/bin/vlink id --renew-cert --data /opt/vlink/data`;
   docker: `docker exec vlink /vlink id --renew-cert`), then a restart. The
   id does not change.

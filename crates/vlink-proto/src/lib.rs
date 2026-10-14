@@ -12,14 +12,16 @@
 //!
 //! The modules a client needs are whole files with nothing of the servers
 //! in them (`error`, `id`, `io`, `list`, `pin`, `target`). What only the
-//! bridge and the hub need is in `tls`, `sign` and `wire`. The Veydan app
-//! depends on this crate as it is: there is no copy of it anywhere.
+//! bridge and the hub need is in `tls`, `sign`, `wire` and `revoke`. The
+//! Veydan app depends on this crate as it is: there is no copy of it
+//! anywhere.
 
 pub mod error;
 pub mod id;
 pub mod io;
 pub mod list;
 pub mod pin;
+pub mod revoke;
 pub mod sign;
 pub mod target;
 pub mod tls;

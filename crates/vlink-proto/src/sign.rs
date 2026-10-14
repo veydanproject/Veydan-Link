@@ -6,6 +6,7 @@ use ring::signature::{Ed25519KeyPair, KeyPair};
 
 use crate::id::BridgeId;
 use crate::list::{delegation_message, hex, list_message, BridgeList, Delegation, Error, SignedList};
+use crate::revoke::{self, Revocations};
 use crate::wire::Registration;
 
 /// A key that signs: the root, a list key or a bridge's key, from PKCS#8 DER.
@@ -50,6 +51,21 @@ impl Signer {
         let text = serde_json::to_string(list).expect("a list is plain data");
         let sig = self.0.sign(&list_message(&text));
         SignedList { list: text, sig: hex(sig.as_ref()), delegation: delegation.clone() }
+    }
+
+    /// As the list key: the hubs of `keys` (SHA-256 of their
+    /// SubjectPublicKeyInfo, hex) revoked as of `issued_at`, under
+    /// `delegation`.
+    pub fn sign_revocations(&self, keys: Vec<String>, issued_at: u64, delegation: &Delegation) -> Revocations {
+        let mut list = Revocations {
+            v: revoke::VERSION,
+            keys: revoke::normalize(keys),
+            issued_at,
+            sig: String::new(),
+            delegation: delegation.clone(),
+        };
+        list.sig = hex(self.0.sign(&list.message()).as_ref());
+        list
     }
 }
 

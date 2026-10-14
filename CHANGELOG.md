@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.3.2 (2026-10-14): idle clients closed, hubs can be revoked, a probe gets a web page
+
+- A connection of a client with no stream open for 120 seconds is closed
+  (`Bridge::set_idle_timeout` changes it, `Status::idle_closed` counts them):
+  it held one of the slots of the bridge, and a handshake that said nothing
+  could fill them all. The decoy connection of `vlink-hub/1` without a
+  certificate follows the same rule.
+- **Hubs can be revoked.** The answer of the registry to a report may
+  carry `revoked`: the keys of the hubs (SHA-256 of the SubjectPublicKeyInfo
+  of their certificates) the root no longer stands behind, signed by the
+  list key under the root's delegation, as the lists of bridges are
+  (`vlink_proto::revoke`, context `vlink-revoked/1`). The bridge takes the
+  newest such list, keeps it in `revoked.json` of its data folder, lets no
+  hub of it link and drops at once the links such a hub holds. A list of
+  another delegation, dated ahead of the clock or older than the one kept
+  changes nothing; the one kept holds after its delegation ran out. A hub
+  whose certificate was stolen stopped being one only when the certificate
+  ran out (90 days); now within five minutes, at the next report.
+- The field is optional both ways: a registry that never revoked a hub
+  sends nothing new, a bridge before it reads past it (spec/protocol.md,
+  «Отзыв хабов»). A private bridge (`--private`) learns of no revocation.
+- `Status::hubs_revoked` and `hubs_revoked=` in the status line of the
+  log: hubs turned away or dropped for it.
+- `vlink_proto::tls::not_after`: the end of a certificate, for the hub's
+  health and the bridge's own chain.
+- **A probe without a certificate gets a web page.** Who chose ALPN
+  `vlink-hub/1` and showed no certificate was closed on at once, which no
+  web server does; now it is served h2 with the SETTINGS a client gets,
+  and every request gets the 404 page of the decoy.
+- **The bridge's certificate looks like any other.** The chain is issued
+  for 90 days (it was 20 years), under names made up for each chain
+  (`kesomara.net`, not `localhost`), and issued again over the same two
+  keys once less than 30 days are left: at the start, and while the bridge
+  runs (looked at every 12 hours; `Handle::set_identity`,
+  `vlink_proto::tls::BridgeCert` shows it from the next handshake, links
+  stay). A chain of 20 years is issued again at the first start. The id
+  stays: clients and hubs pin the bridge's key, not the fields.
+- Still told apart by a probe that knows the protocol, as accepted for now
+  (spec/protocol.md, «Порт моста»): the bridge selects `vlink-hub/1` when
+  it is offered, sends a CertificateRequest to everybody, and its chain is
+  signed by no public authority.
+
 ## 0.3.1 (2026-10-13): the README says how to install
 
 - README.md: what a bridge needs, both ways to install it (as a service by
