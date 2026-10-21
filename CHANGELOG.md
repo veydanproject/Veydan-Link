@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 (2026-10-21): no trust in the distrusted emSign intermediates
+
+- `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10 (RUSTSEC-2026-0382,
+  RUSTSEC-2026-0381): a certificate path through one of the emSign
+  intermediates whose private keys are now known is refused, and the root
+  `emSign ECC Root CA - G3` is no longer among the bundled roots. Nothing
+  else changed.
+
 ## 0.3.2 (2026-10-14): idle clients closed, hubs can be revoked, a probe gets a web page
 
 - A connection of a client with no stream open for 120 seconds is closed
