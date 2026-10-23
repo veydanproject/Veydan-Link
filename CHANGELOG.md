@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4 (2026-10-23): tokio 1.54.1
+
+- `tokio` 1.54.1 (RUSTSEC-2026-0386): the constructors of `AsyncFd` that took
+  any raw descriptor violate I/O safety; VLink never builds an `AsyncFd`,
+  and the version follows so that no lock holds the unsound one. Nothing
+  else changed.
+
 ## 0.3.3 (2026-10-21): no trust in the distrusted emSign intermediates
 
 - `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10 (RUSTSEC-2026-0382,
