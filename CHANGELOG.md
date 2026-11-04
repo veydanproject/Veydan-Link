@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.5 (2026-11-04): the monitoring agent is on by default
+
+- The agent of the project's monitoring in the image now runs unless you
+  turn it off with `VEYDAN_AGENT=off` (also `0`, `false`, `no`); before,
+  it ran only with `VEYDAN_AGENT=on`. What it sends and does is the same:
+  a report every five minutes signed with the bridge's key (kind, version,
+  uptime, the container's CPU and memory, its last errors) and two checks
+  towards the project's own servers; nothing about who uses the bridge.
+  README.md, "Project monitoring (on by default)". The bridge itself did
+  not change.
+
 ## 0.3.4 (2026-10-23): tokio 1.54.1
 
 - `tokio` 1.54.1 (RUSTSEC-2026-0386): the constructors of `AsyncFd` that took

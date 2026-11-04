@@ -237,12 +237,12 @@ with `-e`.
   Docker: `docker rm -f vlink && docker volume rm vlink`. The registry
   forgets a bridge that went silent by itself.
 
-## Project monitoring (optional)
+## Project monitoring (on by default)
 
 The image carries a second, small program: the agent of the project's
-monitoring. It is off unless you turn it on with `-e VEYDAN_AGENT=on` (or
-`VEYDAN_AGENT: "on"` under `environment:` in `docker-compose.yml`). Once
-on, it sends a short report every five minutes to the project's servers,
+monitoring. It is on unless you turn it off with `-e VEYDAN_AGENT=off`
+(or `VEYDAN_AGENT: "off"` under `environment:` in `docker-compose.yml`).
+It sends a short report every five minutes to the project's servers,
 signed with the bridge's own key (`bridge.key` in `/data`): the bridge's
 kind, version and uptime, the CPU and memory of the container, its last
 errors (no address of anyone in them), and the results of the checks it
@@ -253,8 +253,9 @@ lists. That shows the project how its network looks from where you are.
 It reports nothing about the server beyond the container, nothing about
 who uses the bridge, and never sees
 anyone's messages, files or calls. It opens no port: it only sends out, so
-your firewall and NAT stay as they are. To turn it off, remove the variable
-and start the container again; the bridge works the same either way.
+your firewall and NAT stay as they are. To turn it off, set the variable
+to `off` and start the container again; the bridge works the same either
+way.
 
 ## What it does and does not see
 

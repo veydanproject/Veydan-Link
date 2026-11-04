@@ -8,10 +8,10 @@
 # the bridge's key (its id), its TLS key and the certificate chain; with
 # the volume gone, the bridge comes back as another bridge.
 #
-# The second binary is the agent of the project's monitoring, off unless the
-# volunteer turns it on (-e VEYDAN_AGENT=on, README.md, "Project
-# monitoring"). It is the first process: without the switch it hands the
-# process over to the bridge at once, so the bridge runs exactly as alone.
+# The second binary is the agent of the project's monitoring, on unless the
+# volunteer turns it off (-e VEYDAN_AGENT=off, README.md, "Project
+# monitoring"). It is the first process: switched off, it hands the process
+# over to the bridge at once, so the bridge runs exactly as alone.
 FROM scratch
 LABEL org.opencontainers.image.title="VLink" \
       org.opencontainers.image.description="The VLink bridge: carries Veydan traffic past a throttled border" \

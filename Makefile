@@ -30,7 +30,7 @@ release-all:
 # The bridge as a docker image.
 IMAGE ?= rookbeam/vlink
 # The agent of the project's monitoring goes into the image beside the
-# node (off unless VEYDAN_AGENT=on): taken from the kit, the build of
+# node (on unless VEYDAN_AGENT=off): taken from the kit, the build of
 # vagent next to this folder by default:  make image VAGENT=<file>
 VAGENT ?= ../cloud/dist/vagent
 image: release
