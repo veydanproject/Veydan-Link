@@ -8,14 +8,15 @@
 # The hub that bridges connect to is not here: it is run by the Veydan
 # project alone. It uses vlink-proto from this folder.
 #
-# Self-contained on purpose: no path dependency leaves this folder, so the
-# whole thing moves to its own repository by moving the folder.
+# Built on the crates of services/common (Veydan-Common): who a node is and
+# what the registry takes. Those are the one path dependency that leaves
+# this folder; a snapshot takes them from Veydan-Common by tag.
 [workspace]
 resolver = "2"
 members = ["crates/vlink-proto", "crates/vlink-client", "crates/vlink"]
 
 [workspace.package]
-version = "0.3.5"
+version = "0.4.0"
 edition = "2021"
 # The newest thing used: `is_multiple_of` (1.87)
 rust-version = "1.87"
@@ -26,6 +27,8 @@ authors = ["Veydan Project"]
 license-file = "LICENSE"
 
 [workspace.dependencies]
+veydan-node = { git = "https://github.com/veydanproject/Veydan-Common", tag = "v0.1.0" }
+registry-proto = { git = "https://github.com/veydanproject/Veydan-Common", tag = "v0.1.0" }
 vlink-proto = { path = "crates/vlink-proto" }
 vlink-client = { path = "crates/vlink-client" }
 

@@ -22,7 +22,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use vlink_proto::revoke::Revocations;
-use vlink_proto::sign::Signer;
+use vlink_proto::sign::{Signer, SignerExt};
 use vlink_proto::wire::{Registered, Registration, State};
 use vlink_proto::BridgeId;
 

@@ -33,7 +33,7 @@ use rcgen::{
     PublicKeyData, SerialNumber, PKCS_ECDSA_P256_SHA256, PKCS_ED25519,
 };
 use vlink_proto::sign::Signer;
-use vlink_proto::tls::Identity;
+use vlink_proto::tls::{Identity, IdentityExt};
 use vlink_proto::BridgeId;
 
 const CERT_FILE: &str = "bridge.crt";
@@ -350,6 +350,7 @@ fn write_private(path: &Path, text: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vlink_proto::sign::BridgeSigner;
 
     fn temp_dir(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("vlink-identity-{name}-{}", std::process::id()));

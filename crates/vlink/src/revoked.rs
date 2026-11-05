@@ -70,7 +70,7 @@ impl Store {
 mod tests {
     use super::*;
     use rcgen::{CertificateParams, KeyPair, PKCS_ED25519};
-    use vlink_proto::sign::Signer;
+    use vlink_proto::sign::{Signer, SignerExt};
 
     struct Root {
         cert: CertificateDer<'static>,

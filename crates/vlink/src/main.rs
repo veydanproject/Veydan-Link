@@ -11,7 +11,7 @@ use tokio::net::TcpListener;
 use vlink::register::Registrar;
 use vlink::{https, identity, revoked, Bridge, Config};
 use vlink_client::{probe, socks, trust, Client};
-use vlink_proto::list::SignedList;
+use vlink_proto::list::{SignedBridges, SignedList};
 use vlink_proto::wire::{Bridges, ProbeReport};
 use vlink_proto::{tls, BridgeRef};
 

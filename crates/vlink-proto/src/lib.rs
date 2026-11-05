@@ -10,30 +10,34 @@
 //! ALPN. On a link the roles of h2 are reversed: the hub dialled, but the
 //! bridge opens the streams.
 //!
-//! The modules a client needs are whole files with nothing of the servers
-//! in them (`error`, `id`, `io`, `list`, `pin`, `target`). What only the
-//! bridge and the hub need is in `tls`, `sign`, `wire` and `revoke`. The
-//! Veydan app depends on this crate as it is: there is no copy of it
-//! anywhere.
+//! Who a node is (`id`, `pin`, `io`, `tls::Identity`, the signed lists) is
+//! `veydan-node`; what the registry takes and says (`wire`, `list`,
+//! `revoke`) is `registry-proto`; both are given here under the names
+//! this crate always had, so that the bridge, the hub and the Veydan app
+//! read one crate. What is VLink's alone — the TLS of a bridge and a hub,
+//! the targets of a stream — lives here.
 
-pub mod error;
-pub mod id;
-pub mod io;
 pub mod list;
-pub mod pin;
 pub mod revoke;
 pub mod sign;
 pub mod target;
 pub mod tls;
 pub mod wire;
 
+pub use veydan_node::{error, io, pin};
+
 pub use error::Error;
-pub use id::{BridgeId, BridgeRef};
 pub use io::H2Stream;
 pub use target::Target;
 
+/// The id of a bridge and all that is needed to reach one
+/// (`203.0.113.7:443#<id>`): a node's, as every node of the network has
+/// them. Given by name, not as aliases, so that `BridgeId(bytes)` builds
+/// one as it always did.
+pub use veydan_node::{NodeId as BridgeId, NodeRef as BridgeRef};
+
 /// Certificate and key types, so that the crates above need no rustls of their own.
-pub use rustls::pki_types as rustls_types;
+pub use veydan_node::rustls_types;
 
 /// Header a bridge adds to a stream it relays: the client's address as the
 /// bridge saw it, `ip:port`.

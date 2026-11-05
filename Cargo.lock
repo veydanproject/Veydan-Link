@@ -513,6 +513,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "registry-proto"
+version = "0.1.0"
+source = "git+https://github.com/veydanproject/Veydan-Common?tag=v0.1.0#d3c9b2cc6eae443ddc557e32fc8beb2ed2e5d763"
+dependencies = [
+ "ring",
+ "rustls",
+ "rustls-webpki",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "veydan-node",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -896,8 +910,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
+name = "veydan-node"
+version = "0.1.0"
+source = "git+https://github.com/veydanproject/Veydan-Common?tag=v0.1.0#d3c9b2cc6eae443ddc557e32fc8beb2ed2e5d763"
+dependencies = [
+ "bytes",
+ "h2",
+ "http",
+ "ring",
+ "rustls",
+ "rustls-webpki",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "vlink"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -919,7 +950,7 @@ dependencies = [
 
 [[package]]
 name = "vlink-client"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "bytes",
  "h2",
@@ -933,11 +964,12 @@ dependencies = [
 
 [[package]]
 name = "vlink-proto"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "bytes",
  "h2",
  "http",
+ "registry-proto",
  "ring",
  "rustls",
  "rustls-webpki",
@@ -945,6 +977,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "veydan-node",
 ]
 
 [[package]]

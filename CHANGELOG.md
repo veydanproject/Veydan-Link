@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 (2026-11-04): built on Veydan Common
+
+- What was general in `vlink-proto` lives in `services/common` now (the
+  repository Veydan-Common): who a node is (`veydan-node`: the id, the
+  pinned TLS, the h2 streams, a node's own chain and key, the signer, the
+  envelope of a signed list) and what the registry takes and says
+  (`registry-proto`: registrations, the signed list of bridges, the
+  revoked hubs). `vlink-proto` gives it all under the names it always had:
+  `BridgeId`/`BridgeRef` are `NodeId`/`NodeRef` by another name, `list`,
+  `wire`, `revoke`, `io`, `pin` re-export. What changed for a user of the
+  crate: `Signer::sign_registration`, `sign_list` and `sign_revocations`
+  are the trait `sign::SignerExt`, `Signer::bridge_id` is
+  `sign::BridgeSigner`, `Identity::bridge_id` is `tls::IdentityExt`, and
+  `SignedList::verify` into a `BridgeList` is `list::SignedBridges` — each
+  in scope by a `use`. The bridge, the client and the wire did not change:
+  a 0.3.x bridge and a 0.4.0 hub read each other as before.
+
 ## 0.3.5 (2026-11-04): the monitoring agent is on by default
 
 - The agent of the project's monitoring in the image now runs unless you
