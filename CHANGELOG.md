@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 (2026-11-07): built on Veydan Common 0.1.1
+
+- The crates of Veydan Common are those of 0.1.1 (`registry-proto` checks
+  the keys of revoked hubs with `veydan-denied`); nothing of VLink itself
+  changed, a 0.4.0 and a 0.4.1 node read each other as before.
+- The workspace's minimum Rust version is the one of the repository's
+  toolchain.
+
 ## 0.4.0 (2026-11-04): built on Veydan Common
 
 - What was general in `vlink-proto` lives in `services/common` now (the
